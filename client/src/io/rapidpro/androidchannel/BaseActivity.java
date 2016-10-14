@@ -46,19 +46,67 @@ public class BaseActivity extends FragmentActivity {
         }
     }
 
-    @Override
-    public boolean onPrepareOptionsMenu(Menu menu) {
-
-        Toast.makeText(getApplicationContext(), "No menu available", Toast.LENGTH_SHORT).show();
-        return false;
-    }
-
-
-    public void onShowSettings(View v){
-        startActivity(new Intent(Intents.SHOW_SETTINGS));
-    }
-
     public void onSync(View v){
         RapidPro.get().sync(true);
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.home, menu);
+
+        // show the settings menu always in debug mode
+        if (BuildConfig.DEBUG) {
+            MenuItem menuItem = menu.findItem(R.id.menu_settings);
+            if (menuItem != null) {
+                menuItem.setVisible(true);
+            }
+
+            MenuItem menuItem = menu.findItem(R.id.action_debug);
+            if (menuItem != null) {
+                menuItem.setVisible(true);
+            }
+        }
+
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        int id = item.getItemId();
+        if (id == R.id.menu_Settings) {
+            startActivity(new Intent(Intents.SHOW_SETTINGS));
+            return true;
+        } else if (id == R.id.action_debug) {
+            sendBugReport();
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    public void sendBugReport() {
+
+        // Log our build and device details
+        StringBuilder info = new StringBuilder();
+        info.append("Version: " + BuildConfig.VERSION_NAME + "; " + BuildConfig.VERSION_CODE);
+        info.append("\n  OS: " + System.getProperty("os.version") + " (API " + Build.VERSION.SDK_INT + ")");
+        info.append("\n  Model: " + android.os.Build.MODEL + " (" + android.os.Build.DEVICE + ")");
+        RapidPro.LOG.d(info.toString());
+
+        // Generate a logcat file
+        File outputFile = new File(Environment.getExternalStorageDirectory(), "android-channel-debug.txt");
+
+        try {
+            Runtime.getRuntime().exec("logcat -d -f " + outputFile.getAbsolutePath() + "  \"*:E RapidPro:*\" ");
+        } catch (Throwable t) {
+            RapidPro.LOG.e("Failed to generate report", t);
+        }
+
+        ShareCompat.IntentBuilder.from(this)
+                .setType("message/rfc822")
+                .addEmailTo("support@rapidpro.io")
+                .setSubject("RapiPro Android Channel Bug Report")
+                .setText("Please include specific details on the error you encountered.")
+                .setStream(Uri.fromFile(outputFile))
+                .setChooserTitle("Send Email")
+                .startChooser();
     }
 }
